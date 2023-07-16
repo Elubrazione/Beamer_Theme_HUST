@@ -1,0 +1,362 @@
+\documentclass{beamer}
+\usepackage{ctex, hyperref}
+\usepackage[T1]{fontenc}
+
+% other packages
+\usepackage{latexsym,amsmath,xcolor,multicol,booktabs,calligra}
+\usepackage{graphicx,pstricks,listings,stackengine}
+
+\author{Lingching Tung}
+\title{Grep: A Graph Learning Based Database Partitioning System}
+\subtitle{}
+\institute{Intelligence Data Storage And Management Laboratory}
+\date{July 11, 2023}
+\usepackage{hust}
+
+% defs
+\def\cmd#1{\texttt{\color{red}\footnotesize $\backslash$#1}}
+\def\env#1{\texttt{\color{blue}\footnotesize #1}}
+\definecolor{deepblue}{rgb}{0,0,0.5}
+\definecolor{deepred}{rgb}{0.6,0,0}
+\definecolor{deepgreen}{rgb}{0,0.5,0}
+\definecolor{halfgray}{gray}{0.55}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\bfseries\color{deepblue},
+    emphstyle=\ttfamily\color{deepred},    % Custom highlighting style
+    stringstyle=\color{deepgreen},
+    numbers=left,
+    numberstyle=\small\color{halfgray},
+    rulesepcolor=\color{red!20!green!20!blue!20},
+    frame=shadowbox,
+}
+
+
+\begin{document}
+
+\kaishu
+\begin{frame}
+    \titlepage
+    \begin{figure}[htpb]
+        \begin{center}
+            \includegraphics[width=0.2\linewidth]{pic/Huazhong_University_of_Science_&_Technology_logo.eps}
+        \end{center}
+    \end{figure}
+\end{frame}
+
+\begin{frame}
+    \tableofcontents[sectionstyle=show,subsectionstyle=show/shaded/hide,subsubsectionstyle=show/shaded/hide]
+\end{frame}
+
+\section{Background}
+\begin{frame}
+    \begin{itemize}[<+-| alert@+>]
+        \item Existing distributed databases rely on users to specify partitioning keys in order to allocate the data to multiple compute nodes.
+
+        \item It calls for an automatic database partitioning method based on both the data distribution and query patterns, whereas problem has been proven to be NP-hard.{\footnote{To simplify the problem, many existing methods rely on single primary keys for partitioning tables, which could be less effective in some scenarios.}}
+
+        \item It is costly to really partition the databases and then evaluate the performance. The state-of-the-art cost model takes single queries as input and cannot encode the data and query distribution under selected partition keys and causes unreliable estimation.{\footnote{Deep reinforcement learning based methods require to evaluate the performance by really partitioning the data}}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Partitioning Challenges}
+    \begin{itemize}
+        \item Efficiently capturing intricate partitioning factors
+        \item Effective selection of partitioning keys for performance optimization
+        \item Evaluation of partitioning performance
+    \end{itemize}
+\end{frame}
+
+
+\section{Overview}
+\begin{frame}{Partitioning Workflow}
+    \begin{itemize}
+        \item Step 1: Train Evaluation Model to predict partitioning strategy performance.
+    \end{itemize}
+    \begin{figure}[htpb]
+        \centering
+        \includegraphics[width=1.03\linewidth]{pic/fig2.png}
+        {Fig. 1. The Grep Overview.}
+    \end{figure}
+\end{frame}
+
+\begin{frame}{Partitioning Workflow}
+    \begin{itemize}
+        \item Step 2: Build Column2Graph Model based on data and query features.
+    \end{itemize}
+    \begin{figure}[htpb]
+        \centering
+        \includegraphics[width=1.03\linewidth]{pic/fig2.png}
+        {Fig. 1. The Grep Overview.}
+    \end{figure}
+\end{frame}
+
+\begin{frame}{Partitioning Workflow}
+    \begin{itemize}
+        \item Step 3: Train Partitioning Model using the graph model to select partitioning keys.
+    \end{itemize}
+    \begin{figure}[htpb]
+        \centering
+        \includegraphics[width=1.03\linewidth]{pic/fig2.png}
+        {Fig. 1. The Grep Overview.}
+    \end{figure}
+\end{frame}
+
+\begin{frame}{Partitioning Workflow}
+    \begin{itemize}
+        \item Step 4: Use Evaluation Model to evaluate the selected keys and provide feedback to the Column2Graph Model and Partitioning Model.
+    \end{itemize}
+    \begin{figure}[htpb]
+        \centering
+        \includegraphics[width=1.03\linewidth]{pic/fig3.png}
+        {Fig. 1. The Grep Overview.}
+    \end{figure}
+\end{frame}
+
+\section{Column2Graph}
+\begin{frame}[fragile]{Define the Model (1): Vertex Feature Vector}
+    \begin{minipage}{1.0\linewidth}
+\begin{lstlisting}[language=Python]
+class Column:
+  def __init__(self, _id, size, selectivity,
+                length, num_f, num_a, num_w):
+    self.table_id = _id
+    self.table_size = size
+    self.tuple_selectivity = selectivity
+    self.tuple_length = length
+    self.num_filters = num_f
+    self.num_aggregates = num_a
+    self.num_writes = num_w
+\end{lstlisting}
+    \end{minipage}\hspace{0cm}
+    \begin{minipage}{1.0\linewidth}
+        \begin{itemize}
+            \item Encode the features of the vertex as a vector, which contains 7 dimensions
+            \begin{itemize}
+                \item #filters: number of filter operations w.r.t. the column
+                \item #writes: number of write operations w.r.t the column
+                \item #aggregates: number of aggregates w.r.t. the column
+            \end{itemize}
+        \end{itemize}
+    \end{minipage}
+\end{frame}
+
+\begin{frame}[fragile]{Define the Model (2): Attention-based Vertex Feature Vector}
+    \begin{exampleblock}{Benefits}
+        \begin{itemize}
+            \item Get the importance of each vertex and enables Grep to prioritize important vertices.
+            \item Better reflect performance requirements by learning different encodings of the graph features.
+        \end{itemize}
+    \end{exampleblock}
+    \begin{exampleblock}{Attention Network}
+        \vspace{0.25cm}
+        \begin{minipage}{1.0\linewidth}
+\begin{lstlisting}[language=Python]
+def __init__(self, input_size):
+    super(AttentionNetwork, self).__init__()
+    self.dense_layer = nn.Linear(input_size, 1)
+\end{lstlisting}
+    \end{minipage}
+        \begin{equation*}
+            V(G) = \sum_{c_j\in{G}} a(c_j) V(c_j)
+        \end{equation*}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Define the Model (3): Edge Weight}
+    \begin{exampleblock}{Frequencies}
+        \begin{itemize}
+            \item What: the number of join predicates containing the columns.
+            \item Why: more remote joins can be reduced by using the frequently joined column as partitioning keys.
+        \end{itemize}
+    \end{exampleblock}
+    \begin{exampleblock}{Cardinalities}
+        \begin{itemize}
+            \item What: sample tuples from the tables and estimate it by executing predicates on the sampled tuples.
+            \item \texttt{sql = "SELECT COUNT(*) FROM \{\} JOIN \{\} ON \{\}".format(lt, rt, predicate)}
+        \end{itemize}
+    \end{exampleblock}
+    \begin{exampleblock}{Weight Computation}
+        \begin{itemize}
+            \item for any edge $\mathrm{(u, v)}$,
+                $\mathrm{W(u, v) = \sum_{q} f(q) Card(u, v, q)}$
+        \end{itemize}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Define the Model (4): Attention-based Edge Feature Vector}
+    \begin{exampleblock}{Attention Network}
+        \begin{align}
+            \psi_{c_j} &= \mathrm{Sigmoid}(V(c_j))\\
+            \mu_{i\to j}(&c_j) = W(c_i,c_j) \psi_{c_i}\psi_{c_j}
+        \end{align}
+        \begin{align}
+            a(c_j) \propto \exp (\hat{\omega}_{jj}\psi_{c_j} + \omega_{jj}\mu_{j\to j}(c_j) + \sum_{c_i} \omega_{ij}\mu_{i\to j}(c_j))
+        \end{align}
+        \begin{itemize}
+            \item ${\omega}_{jj}$ is the network weight, and $\hat{\omega}_{jj}$ is the unit vector of $w_{jj}$;
+            \item $\psi_{c_j}$ is the normalized vertex features; $\mu_{i\to j}(c_j)$ is the edge feature vector where $c_i$ is any adjacent vertex of $c_j$ and $W(c_i, c_j)$ is the edge weight.
+        \end{itemize}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}[fragile]{Define the Model (4): Attention-based Edge Feature Vector}
+    \begin{minipage}{1.0\linewidth}
+\begin{lstlisting}[language=Python]
+def forward(self, vertex_matrix, adj_matrix):
+  vertex_n = torch.sigmoid(vertex_matrix)
+
+  mu = torch.matmul(adj_matrix, vertex_n)
+  mu_self = torch.diag(mu)
+  mu_sum = torch.sum(mu, dim=1) - mu_self
+
+  attention_logits =
+      self.dense_layer(vertex_n)
+  attention_logits +=
+      mu_self.view(-1, 1) + mu_sum.view(-1, 1)
+  attention_weights =
+      F.softmax(attention_logits, dim=1)
+
+  return attention_weights
+\end{lstlisting}
+    \end{minipage}
+\end{frame}
+
+\begin{frame}{Example}
+    \begin{figure}[htpb]
+        \centering
+        \includegraphics[width=1.08\linewidth]{pic/fig1.png}
+        {Fig. 2. Column Graph Construction.}
+    \end{figure}
+\end{frame}
+
+\section{Partitioning Model}
+\begin{frame}{Architecture}
+    Grep use graph model to select partitioning keys.
+
+    \begin{exampleblock}{Input}
+        \begin{itemize}
+            \item the graph model in the form of vertex matrix and edge matrix
+        \end{itemize}
+    \end{exampleblock}
+    \begin{exampleblock}{Output}
+        \begin{itemize}
+            \item selected columns
+        \end{itemize}
+    \end{exampleblock}
+    \begin{exampleblock}{Components}
+        \begin{itemize}
+            \item Graph Embedding
+            \item Partitioning-Key Selection
+        \end{itemize}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Graph Embedding}
+    \begin{itemize}
+        \item Graph Neural Network includes a graph embedding layer and an activation function $ReLU$:
+        \begin{itemize}
+            \item The graph embedding layer encodes the join patterns via graph convolution;
+            \item The $ReLU$ layer converts the embedded columns into a fixed-length vector
+        \end{itemize}
+        \item For each column $c_i$ , we denote the graph structures as
+            \begin{align}
+                G(c_i ) = (V (c_i ), D(c_i ), E)\nonumber
+            \end{align}
+            \begin{itemize}
+                \item $V (c_i )$ is the column feature vector;
+                \item $D(c_i )$ is the neighborhood matrix with each row representing the feature vector of a joined column of $c_i$;
+                \item $E$ is the edge matrix
+            \end{itemize}
+        \item We need to embed these three factors into an embedding vector $H (c_i )$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Graph Embedding Algorithm (1)}
+    \begin{minipage}{0.4\linewidth}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\linewidth]{pic/fig4.png}
+            {Fig. 4. Graph Embedding.}
+        \end{figure}
+    \end{minipage}%
+    \begin{minipage}{0.6\linewidth}
+        \begin{itemize}
+            \item Step 1 - Represent Graph Structure.
+            \item Step 2 - Embed Neighbor Information.
+            \item Step 3 - Embed into Fixed-Length Vector.
+        \end{itemize}
+    \end{minipage}
+\end{frame}
+
+\begin{frame}{Graph Embedding Algorithm (2)}
+
+\end{frame}
+
+\begin{frame}[fragile]{Partitioning-Key Selection (1)}
+    \begin{minipage}{1.045\linewidth}
+\begin{lstlisting}[language=Python]
+def forward(self, graph):
+    padded_vertex_matrix, padded_edge_matrix = 
+        self.padding_graph_matrices(
+            graph.vertex_matrix, graph.edge_matrix)
+    origin_graph = graph
+    embed = padded_vertex_matrix
+    for gnn in self.gnns:
+        embed, V =
+            gnn(embed, padded_edge_matrix)
+    total_r = torch.ones(embed.shape[0])
+\end{lstlisting}
+    \end{minipage}
+\end{frame} 
+
+\begin{frame}[fragile]{Partitioning-Key Selection (2)}
+    \begin{minipage}{1.045\linewidth}
+\begin{lstlisting}[language=python]
+for gnn in reversed(self.gnns):
+    gnn_weights = gnn.W[:embed.size(-1), :]
+    partial_derivatives = gnn_weights.t() * total_r
+
+relevance =
+    partial_derivatives[:embed.size(-1), :] * embed
+
+total_r = relevance.sum(dim=1)
+benefits =
+    total_r[:origin_graph.vertex_matrix.size(0)]
+
+probabilities =
+    torch.exp(benefits) / (1 + torch.exp(benefits))
+
+partitioning_keys = (probabilities > 0.5).int()
+return partitioning_keys
+\end{lstlisting}
+    \end{minipage}
+\end{frame}
+
+\section{Evaluation Model}
+
+
+\section{Experiments}
+
+\section{References}
+https://www.overleaf.com/project/64a99e98a6fdbb1926cadf88
+
+
+\begin{frame}[allowframebreaks]
+    \bibliography{ref}
+    \bibliographystyle{alpha}
+    % 如果参考文献太多的话，可以像下面这样调整字体：
+    % \tiny\bibliographystyle{alpha}
+\end{frame}
+
+\begin{frame}
+    \begin{center}
+        {\Huge\calligra Thanks for your attention!}
+        \vspace{1cm}
+
+        {\Huge Q \& A}
+    \end{center}
+\end{frame}
+
+\end{document}
