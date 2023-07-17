@@ -10,8 +10,8 @@
 \title{Grep: A Graph Learning Based Database Partitioning System}
 \subtitle{}
 \institute{Intelligence Data Storage And Management Laboratory}
-\date{July 11, 2023}
-\usepackage{hust}
+\date{July 13, 2023}
+\usepackage{Tsinghua}
 
 % defs
 \def\cmd#1{\texttt{\color{red}\footnotesize $\backslash$#1}}
@@ -77,7 +77,7 @@
     \begin{figure}[htpb]
         \centering
         \includegraphics[width=1.03\linewidth]{pic/fig2.png}
-        {Fig. 1. The Grep Overview.}
+        \tiny{Fig. 1. The Grep Overview.}
     \end{figure}
 \end{frame}
 
@@ -88,7 +88,7 @@
     \begin{figure}[htpb]
         \centering
         \includegraphics[width=1.03\linewidth]{pic/fig2.png}
-        {Fig. 1. The Grep Overview.}
+        \tiny{Fig. 1. The Grep Overview.}
     \end{figure}
 \end{frame}
 
@@ -99,7 +99,7 @@
     \begin{figure}[htpb]
         \centering
         \includegraphics[width=1.03\linewidth]{pic/fig2.png}
-        {Fig. 1. The Grep Overview.}
+        \tiny{Fig. 1. The Grep Overview.}
     \end{figure}
 \end{frame}
 
@@ -110,11 +110,12 @@
     \begin{figure}[htpb]
         \centering
         \includegraphics[width=1.03\linewidth]{pic/fig3.png}
-        {Fig. 1. The Grep Overview.}
+        \tiny{Fig. 1. The Grep Overview.}
     \end{figure}
 \end{frame}
 
 \section{Column2Graph}
+\subsection{Define the Model}
 \begin{frame}[fragile]{Define the Model (1): Vertex Feature Vector}
     \begin{minipage}{1.0\linewidth}
 \begin{lstlisting}[language=Python]
@@ -206,32 +207,34 @@ def __init__(self, input_size):
 \begin{lstlisting}[language=Python]
 def forward(self, vertex_matrix, adj_matrix):
   vertex_n = torch.sigmoid(vertex_matrix)
-
+  
   mu = torch.matmul(adj_matrix, vertex_n)
   mu_self = torch.diag(mu)
   mu_sum = torch.sum(mu, dim=1) - mu_self
-
-  attention_logits =
+  
+  attention_logits = 
       self.dense_layer(vertex_n)
-  attention_logits +=
+  attention_logits += 
       mu_self.view(-1, 1) + mu_sum.view(-1, 1)
   attention_weights =
       F.softmax(attention_logits, dim=1)
 
   return attention_weights
 \end{lstlisting}
-    \end{minipage}
+    \end{minipage}    
 \end{frame}
 
+\subsection{Example}
 \begin{frame}{Example}
     \begin{figure}[htpb]
         \centering
         \includegraphics[width=1.08\linewidth]{pic/fig1.png}
-        {Fig. 2. Column Graph Construction.}
+        \tiny{Fig. 2. Column Graph Construction.}
     \end{figure}
 \end{frame}
 
 \section{Partitioning Model}
+\subsection{Architecture}
 \begin{frame}{Architecture}
     Grep use graph model to select partitioning keys.
 
@@ -253,6 +256,7 @@ def forward(self, vertex_matrix, adj_matrix):
     \end{exampleblock}
 \end{frame}
 
+\subsection{Graph Embedding}
 \begin{frame}{Graph Embedding}
     \begin{itemize}
         \item Graph Neural Network includes a graph embedding layer and an activation function $ReLU$:
@@ -260,7 +264,7 @@ def forward(self, vertex_matrix, adj_matrix):
             \item The graph embedding layer encodes the join patterns via graph convolution;
             \item The $ReLU$ layer converts the embedded columns into a fixed-length vector
         \end{itemize}
-        \item For each column $c_i$ , we denote the graph structures as
+        \item For each column $c_i$ , we denote the graph structures as 
             \begin{align}
                 G(c_i ) = (V (c_i ), D(c_i ), E)\nonumber
             \end{align}
@@ -273,28 +277,69 @@ def forward(self, vertex_matrix, adj_matrix):
     \end{itemize}
 \end{frame}
 
+\subsection{Graph Embedding Algorithm}
 \begin{frame}{Graph Embedding Algorithm (1)}
     \begin{minipage}{0.4\linewidth}
         \begin{figure}[htpb]
             \centering
             \includegraphics[width=1\linewidth]{pic/fig4.png}
-            {Fig. 4. Graph Embedding.}
+            \tiny{Fig. 3. Graph Embedding.}
         \end{figure}
     \end{minipage}%
-    \begin{minipage}{0.6\linewidth}
+    \begin{minipage}{0.65\linewidth}
         \begin{itemize}
             \item Step 1 - Represent Graph Structure.
-            \item Step 2 - Embed Neighbor Information.
-            \item Step 3 - Embed into Fixed-Length Vector.
         \end{itemize}
     \end{minipage}
 \end{frame}
 
 \begin{frame}{Graph Embedding Algorithm (2)}
-
+    \begin{minipage}{0.4\linewidth}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\linewidth]{pic/fig4.png}
+            \tiny{Fig. 3. Graph Embedding.}
+        \end{figure}
+    \end{minipage}%
+    \begin{minipage}{0.65\linewidth}
+        \begin{itemize}
+            \item Step 2 - Embed Neighbor Information.
+        \end{itemize}
+    \end{minipage}
 \end{frame}
 
-\begin{frame}[fragile]{Partitioning-Key Selection (1)}
+\begin{frame}{Graph Embedding Algorithm (3)}
+    \begin{minipage}{0.4\linewidth}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\linewidth]{pic/fig4.png}
+            \tiny{Fig. 3. Graph Embedding.}
+        \end{figure}
+    \end{minipage}%
+    \begin{minipage}{0.65\linewidth}
+        \begin{itemize}
+            \item Step 3 - Embed into Fixed-Length Vector.
+        \end{itemize}
+    \end{minipage}
+\end{frame}
+
+\subsection{Key Selection}
+\begin{frame}{Key Selection}
+    Utilize Taylor decomposition to reversely extract the relevance of each column to the embeddings in the Graph Neural Network and then select keys based on the relevance distribution
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item Why: it is hard to directly select columns from the embedding vectors extracted from graph features by Graph Neural Network, which are high dimensional and require further training to capture correlations.
+        \vspace{0.15cm}
+        \item What: includes two parts
+            \begin{itemize}
+                \item Taylor decomposition;
+                \item Binary classification: It inputs the partitioning benefits of all the columns and outputs the selection keys with multinomial logistic regression, where 1 denotes a column is selected and 0 otherwise.
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\subsection{Key Selection Algorithm}
+\begin{frame}[fragile]{Key Selection Algorithm (1)}
     \begin{minipage}{1.045\linewidth}
 \begin{lstlisting}[language=Python]
 def forward(self, graph):
@@ -311,7 +356,7 @@ def forward(self, graph):
     \end{minipage}
 \end{frame} 
 
-\begin{frame}[fragile]{Partitioning-Key Selection (2)}
+\begin{frame}[fragile]{Key Selection Algorithm (2)}
     \begin{minipage}{1.045\linewidth}
 \begin{lstlisting}[language=python]
 for gnn in reversed(self.gnns):
@@ -335,20 +380,95 @@ return partitioning_keys
 \end{frame}
 
 \section{Evaluation Model}
-
-
-\section{Experiments}
-
-\section{References}
-https://www.overleaf.com/project/64a99e98a6fdbb1926cadf88
-
-
-\begin{frame}[allowframebreaks]
-    \bibliography{ref}
-    \bibliographystyle{alpha}
-    % 如果参考文献太多的话，可以像下面这样调整字体：
-    % \tiny\bibliographystyle{alpha}
+\subsection{Model Overview}
+\begin{frame}{Model Overview}
+    \begin{itemize}
+        \item Generate a k-node sample graph, where the vertices are sampled tuples and the edges are join correlations between tuples, and k denotes the node number. Then utilize graph learning to estimate the partitioning performance using the k-node sample graph.
+    \end{itemize}
+    \vspace{0.35cm}
+    \begin{minipage}{1.0\linewidth}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\linewidth]{pic/fig6.png}
+            \tiny{Fig. 4. Evaluation Model.}
+        \end{figure}
+    \end{minipage}
 \end{frame}
+
+\subsection{Evaluation Algorithm}
+\begin{frame}{Evaluation Algorithm (1)}
+    \begin{exampleblock}{Step 1 - Representation of Single Node.}
+        \begin{itemize}
+            \item Aggregate the features within the subgraph of each node.
+            \item Embed the node into k embedding vectors $H(P_i)$ by multiplying the edge weight matrix, vertex matrix of each node with the globally-shared graph network weights.
+        \end{itemize}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Evaluation Algorithm (2)}
+    \begin{exampleblock}{Step 2 - Representation of Multiple Nodes.}
+        \begin{itemize}
+            \item Generate a k-vertex graph
+            \vspace{0.1cm}
+            \item Conduct convolution on $\widetilde{V}$ and $\widetilde{E}$ to embrace remote join relations into partitioning vectors, denoted as $H (P) = \widetilde{E} ∗ \widetilde{V} · \widetilde{\omega}$, where $\widetilde{\omega}$ is the network weight
+            \vspace{0.1cm}
+            \item Conduct max pooling on $H (P)$ to pool up the partitioning vectors into a graph vector to represent the overall query costs within the k-node sample graph.
+        \end{itemize}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}[fragile]{Evaluation Algorithm (2)}
+    \begin{minipage}{1.04\linewidth}
+\begin{lstlisting}[language=python]
+def multiple_nodes(self, v_matrix, edge_matrix):
+    # Generate k-vertex graph
+    # +with compound vertex matrix and edge matrix
+    tilde_v = torch.cat(v_matrix, dim=0)
+    tilde_e = edge_matrix
+
+    # Convolution on tilde_v and tilde_e
+    h_p = torch.matmul(tilde_e, tilde_v)
+    return h_p
+
+def max_pooling(self, h_p):
+    graph_vector = torch.max(
+        h_p, dim=0)[0].unsqueeze(0)
+    return graph_vector
+\end{lstlisting}
+    \end{minipage}
+\end{frame}
+
+\begin{frame}[fragile]{Evaluation Algorithm (3)}
+    \begin{exampleblock}{Step 3 - Query Performance Mapping.}
+        \begin{itemize}
+            \item Use a fully-connected layer, with ReLU as the activation function, to map the graph vector on sampled tuples into the partitioning performance on the whole dataset.
+        \end{itemize}
+    \end{exampleblock}
+    \vspace{0.15cm}
+    \begin{minipage}{1.04\linewidth}
+\begin{lstlisting}[language=python]
+def query_performance_mapping(self, graph_vector):
+    fc_layer = nn.Sequential(
+        nn.Linear(graph_vector.size(1), 1),
+        nn.ReLU()
+    )
+
+    performance = fc_layer(graph_vector)
+    return performance
+\end{lstlisting}
+    \end{minipage}
+\end{frame}
+
+% \section{Experiments}
+
+%\section{References}
+
+% \begin{frame}[allowframebreaks]
+%     \bibliography{ref}
+%     \bibliographystyle{alpha}
+%     % 如果参考文献太多的话，可以像下面这样调整字体：
+%     % \tiny\bibliographystyle{alpha}
+% \end{frame}
 
 \begin{frame}
     \begin{center}
